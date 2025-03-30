@@ -166,7 +166,7 @@ if uploaded_file:
         """Fetch response from Gemini AI, limited to uploaded data"""
         query_prompt = f"Analyze this dataset with columns: {', '.join(df.columns)} and answer briefly: {user_query}"
         chat_response = model.generate_content(query_prompt)
-        return chat_response.text[:200] if hasattr(chat_response, "text") else "No response."
+        return chat_response.text[:500] if hasattr(chat_response, "text") else "No response."
 
     with st.expander("💬 Open AI Chatbot"):
         st.write("Ask questions about your uploaded data.")
