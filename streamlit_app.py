@@ -11,8 +11,10 @@ import google.generativeai as genai
 import pdfkit
 import time
 import os
+from dotenv import load_dotenv
 
-# Configure Gemini AI
+# Load environment variables from .env file
+load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 model = genai.GenerativeModel("gemini-2.0-flash")
