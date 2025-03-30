@@ -1,4 +1,3 @@
-appwrite
 base64
 textwrap
 plotly
