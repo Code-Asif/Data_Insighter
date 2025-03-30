@@ -13,7 +13,7 @@ import time
 import os
 
 # Configure Gemini AI
-genai.configure(api_key="AIzaSyCFHAd_L0QwsFSDvhLOUpGgijlVGVP9JW0")
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 model = genai.GenerativeModel("gemini-2.0-flash")
 
