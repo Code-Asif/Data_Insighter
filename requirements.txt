@@ -1,4 +1,4 @@
-python-dotenv
+dotenv
 base64
 textwrap
 plotly
