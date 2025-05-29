@@ -1,10 +1,6 @@
-base64
-textwrap
 plotly
 streamlit
 pandas
 plotly-express
 google-generativeai
 pdfkit
-time
-os
