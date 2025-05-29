@@ -1,6 +1,3 @@
-from appwrite.client import Client
-from appwrite.services.storage import Storage
-from appwrite.services.account import Account
 import base64
 import textwrap
 import plotly.io as pio
@@ -13,7 +10,6 @@ import time
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -26,7 +22,6 @@ st.set_page_config(page_title="AI-Powered Business Analytics", layout="wide")
 st.title("📊 Data Insighter")
 st.write("Upload your business data to get interactive reports and AI-driven insights.")
 
-# File Upload
 uploaded_file = st.file_uploader("Upload CSV or Excel File", type=["csv", "xlsx"])
 
 if uploaded_file:
@@ -37,7 +32,7 @@ if uploaded_file:
         st.error(f"Error loading file: {e}")
         st.stop()
 
-    df.dropna(inplace=True)  # Remove null values
+    df.dropna(inplace=True)
 
     st.subheader("Select Columns to Keep")
     selected_columns = st.multiselect("Choose columns:", df.columns.tolist(), default=df.columns.tolist())
@@ -51,16 +46,15 @@ if uploaded_file:
     column_types = {col: str(df[col].dtype) for col in df.columns}
 
     st.write("🔍 *Analyzing Data...* Please wait while AI generates insights.")
-    time.sleep(2)
+    time.sleep(2)  
 
-    # AI decides suitable visualization types
     prompt = f"""Given these columns and their data types:
     {column_types}
     Suggest 5 suitable visualization types (Pie, Bar, Line, Scatter, Histogram, or Geographic if applicable).
     Only return the chart names as a comma-separated list."""
-
+    
     gemini_response = model.generate_content(prompt)
-
+    
     if hasattr(gemini_response, "text"):
         viz_types = [v.strip().lower() for v in gemini_response.text.split(",") if v.strip().lower() in ["pie", "bar", "line", "scatter", "histogram"]]
         if len(viz_types) < 5:
@@ -103,36 +97,45 @@ if uploaded_file:
     st.subheader("📝 AI-Generated Business Insights")
     st.write("Analyzing data for key takeaways...")
 
-    # AI-Generated Business Summary
-    summary_prompt = f"Given this dataset with columns: {', '.join(df.columns)}, provide a short summary of insights, trends, and possible business improvements."
+    # ✅ Generate AI Summary
+    summary_prompt = f"Given this dataset with columns: {', '.join(df.columns)}, provide a summary of insights, trends, and possible business improvements."
     summary_response = model.generate_content(summary_prompt)
 
-    summary_text = summary_response.text if hasattr(summary_response, "text") else "No insights generated."
-    st.write(f"*Business Insights:* {summary_text}")
+    if hasattr(summary_response, "text"):
+        summary_text = summary_response.text
+        st.write(f"*Business Insights:* {summary_text}")
+    else:
+        st.error("Error: AI did not return a valid summary.")
+        st.stop()
 
-    # Arrange Visualizations in a Grid
+    # --- 📊 **Arrange Worksheets in a 3×2 Grid Layout** ---
     st.markdown("---")
     st.subheader("📈 Data Visualizations (5 Worksheets)")
 
+    # ✅ Create 3 columns for the grid layout
     cols = st.columns(3)
 
-    for i, fig in enumerate(charts[:5]):  
-        with cols[i % 3]:  
+    # ✅ Display charts in a 3×2 format
+    for i, fig in enumerate(charts[:5]):  # Limit to 5 charts
+        with cols[i % 3]:  # Distribute across columns
             st.plotly_chart(fig, use_container_width=True, key=f"worksheet_{i}")
 
     if st.button("📥 Download Report as PDF"):
         st.write("🔄 Generating Report... Please wait.")
 
-        # Save Charts as Images
+        # ✅ Save Charts as Images
         chart_images = []
         for i, fig in enumerate(charts):
             chart_path = f"chart_{i}.png"
-            pio.write_image(fig, chart_path)  
+            pio.write_image(fig, chart_path)  # Save chart as image
             chart_images.append(chart_path)
 
-        summary_title = "Key Insights from Your Business Data"
-
-        wrapped_text = textwrap.wrap(summary_text, width=120)[:10]
+        # ✅ Format Business Summary into Short Bullets
+        summary_title = " Key Insights from your  Business Data"
+        
+        wrapped_text = textwrap.wrap(summary_text, width=120)  # Wrap text for better readability
+        # Limit the number of lines to 10 for the summary
+        wrapped_text = wrapped_text[:10]  # Limit to 10 lines for the summary
         bullet_points = "".join(f"<li>{line.strip()}</li>" for line in wrapped_text if line.strip())
 
         summary_html = f"""
@@ -145,28 +148,29 @@ if uploaded_file:
         <h2 style="color:#1F618D;"> Data Visualizations</h2>
         """
 
+        # ✅ Embed Charts as Images in the Report
         for img_path in chart_images:
             with open(img_path, "rb") as img_file:
                 base64_img = base64.b64encode(img_file.read()).decode()
             summary_html += f'<img src="data:image/png;base64,{base64_img}" style="width:100%; margin-bottom:20px;">'
 
+        # ✅ Generate & Download PDF
         pdf_path = "Business_Report.pdf"
         pdfkit.from_string(summary_html, pdf_path, configuration=PDFKIT_CONFIG)
 
         with open(pdf_path, "rb") as file:
             st.download_button("📥 Download Report", file, file_name="Business_Report.pdf", mime="application/pdf")
-
-    # AI Chatbot Section
+        # AI Chatbot
     st.markdown("---")
     st.subheader("🤖 AI Chatbot for Data Queries")
 
     chat_history = st.session_state.get("chat_history", [])
 
     def chatbot_response(user_query):
-        """Fetch response from Gemini AI, limited to uploaded data"""
-        query_prompt = f"Analyze this dataset with columns: {', '.join(df.columns)} and answer briefly: {user_query}"
+        """Fetch response from Gemini AI"""
+        query_prompt = f"Analyze the uploaded dataset and answer: {user_query}"
         chat_response = model.generate_content(query_prompt)
-        return chat_response.text[:500] if hasattr(chat_response, "text") else "No response."
+        return chat_response.text if hasattr(chat_response, "text") else "I'm sorry, I couldn't process that."
 
     with st.expander("💬 Open AI Chatbot"):
         st.write("Ask questions about your uploaded data.")
@@ -183,4 +187,13 @@ if uploaded_file:
                 st.write(f"**You:** {chat['query']}")
                 st.write(f"**AI:** {chat['response']}")
 
+    # Floating Chatbot Button
+    chat_open = st.sidebar.button("💬 Open Chatbot")
 
+    if chat_open:
+        st.sidebar.write("AI Chatbot is now active!")
+        user_query_sidebar = st.sidebar.text_input("Ask AI:")
+        if st.sidebar.button("Submit"):
+            if user_query_sidebar:
+                response_sidebar = chatbot_response(user_query_sidebar)
+                st.sidebar.write(f"**AI:** {response_sidebar}")
