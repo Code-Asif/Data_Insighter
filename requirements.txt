@@ -1,6 +1,7 @@
 streamlit
 pandas
 plotly
-google-generativeai
 python-dotenv
-weasyprint
+google-generativeai
+kaleido
+reportlab

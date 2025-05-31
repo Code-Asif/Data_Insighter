@@ -8,15 +8,17 @@ import google.generativeai as genai
 import time
 import os
 from dotenv import load_dotenv
-from weasyprint import HTML  # ✅ Replaces pdfkit
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
 
+# Load environment variable
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
 model = genai.GenerativeModel("gemini-2.0-flash")
 
+# Streamlit UI setup
 st.set_page_config(page_title="AI-Powered Business Analytics", layout="wide")
-
 st.title("📊 Data Insighter")
 st.write("Upload your business data to get interactive reports and AI-driven insights.")
 
@@ -34,7 +36,6 @@ if uploaded_file:
 
     st.subheader("Select Columns to Keep")
     selected_columns = st.multiselect("Choose columns:", df.columns.tolist(), default=df.columns.tolist())
-
     if selected_columns:
         df = df[selected_columns]
 
@@ -64,6 +65,8 @@ if uploaded_file:
     st.write(f"*AI Selected Visualizations:* {', '.join(viz_types)}")
 
     charts = []
+    chart_images = []
+
     for viz in viz_types:
         st.subheader(f"📌 {viz.capitalize()} Chart")
         fig = None
@@ -91,7 +94,6 @@ if uploaded_file:
             st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    
     st.subheader("📝 AI-Generated Business Insights")
     st.write("Analyzing data for key takeaways...")
 
@@ -105,48 +107,45 @@ if uploaded_file:
         st.error("Error: AI did not return a valid summary.")
         st.stop()
 
+    # Grid layout for charts
     st.markdown("---")
-    st.subheader("📈 Data Visualizations (5 Worksheets)")
+    st.subheader("📈 Data Visualizations (3×2 Grid)")
     cols = st.columns(3)
-
-    for i, fig in enumerate(charts[:5]):
+    for i, fig in enumerate(charts[:6]):
         with cols[i % 3]:
             st.plotly_chart(fig, use_container_width=True, key=f"worksheet_{i}")
 
     if st.button("📥 Download Report as PDF"):
-        st.write("🔄 Generating Report... Please wait.")
+        st.write("🔄 Generating PDF Report... Please wait.")
 
-        chart_images = []
-        for i, fig in enumerate(charts):
-            chart_path = f"chart_{i}.png"
-            pio.write_image(fig, chart_path)
-            chart_images.append(chart_path)
+        # Save images with Plotly + Kaleido
+        img_paths = []
+        for i, fig in enumerate(charts[:5]):
+            img_path = f"chart_{i}.png"
+            pio.write_image(fig, img_path)
+            img_paths.append(img_path)
 
-        summary_title = "Key Insights from your Business Data"
-        wrapped_text = textwrap.wrap(summary_text, width=120)
-        wrapped_text = wrapped_text[:10]
-        bullet_points = "".join(f"<li>{line.strip()}</li>" for line in wrapped_text if line.strip())
+        # Generate PDF with ReportLab
+        pdf_file = "Business_Report.pdf"
+        doc = SimpleDocTemplate(pdf_file, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = [Paragraph("Data Insighter Report", styles["Title"]),
+                 Spacer(1, 12),
+                 Paragraph("Key Business Insights", styles["Heading2"])]
 
-        summary_html = f"""
-        <h1 style="text-align:center; color:#2C3E50;">Data Insighter</h1>
-        <h2 style="color:#1F618D;">{summary_title}</h2>
-        <ul style="font-size:16px; line-height:1.6; color:#283747;">
-            {bullet_points}
-        </ul>
-        <hr>
-        <h2 style="color:#1F618D;">Data Visualizations</h2>
-        """
+        for line in textwrap.wrap(summary_text, 100)[:10]:
+            story.append(Paragraph(f"• {line}", styles["BodyText"]))
 
-        for img_path in chart_images:
-            with open(img_path, "rb") as img_file:
-                base64_img = base64.b64encode(img_file.read()).decode()
-            summary_html += f'<img src="data:image/png;base64,{base64_img}" style="width:100%; margin-bottom:20px;">'
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("Charts", styles["Heading2"]))
+        for img_path in img_paths:
+            story.append(Spacer(1, 12))
+            story.append(RLImage(img_path, width=450, height=300))
 
-        pdf_path = "Business_Report.pdf"
-        HTML(string=summary_html).write_pdf(pdf_path)  # ✅ WeasyPrint
+        doc.build(story)
 
-        with open(pdf_path, "rb") as file:
-            st.download_button("📥 Download Report", file, file_name="Business_Report.pdf", mime="application/pdf")
+        with open(pdf_file, "rb") as file:
+            st.download_button("📥 Download PDF", file, file_name="Business_Report.pdf", mime="application/pdf")
 
     st.markdown("---")
     st.subheader("🤖 AI Chatbot for Data Queries")
@@ -173,9 +172,7 @@ if uploaded_file:
                 st.write(f"**You:** {chat['query']}")
                 st.write(f"**AI:** {chat['response']}")
 
-    chat_open = st.sidebar.button("💬 Open Chatbot")
-
-    if chat_open:
+    if st.sidebar.button("💬 Open Chatbot"):
         st.sidebar.write("AI Chatbot is now active!")
         user_query_sidebar = st.sidebar.text_input("Ask AI:")
         if st.sidebar.button("Submit"):
