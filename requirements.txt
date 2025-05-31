@@ -1,11 +1,6 @@
-python-dotenv
-base64
-textwrap
-plotly
 streamlit
 pandas
-plotly-express
+plotly
 google-generativeai
-pdfkit
-time
-os
+python-dotenv
+weasyprint

@@ -5,17 +5,15 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import google.generativeai as genai
-import pdfkit
 import time
 import os
 from dotenv import load_dotenv
+from weasyprint import HTML  # ✅ Replaces pdfkit
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 model = genai.GenerativeModel("gemini-2.0-flash")
-
-PDFKIT_CONFIG = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
 
 st.set_page_config(page_title="AI-Powered Business Analytics", layout="wide")
 
@@ -46,19 +44,19 @@ if uploaded_file:
     column_types = {col: str(df[col].dtype) for col in df.columns}
 
     st.write("🔍 *Analyzing Data...* Please wait while AI generates insights.")
-    time.sleep(2)  
+    time.sleep(2)
 
     prompt = f"""Given these columns and their data types:
     {column_types}
     Suggest 5 suitable visualization types (Pie, Bar, Line, Scatter, Histogram, or Geographic if applicable).
     Only return the chart names as a comma-separated list."""
-    
+
     gemini_response = model.generate_content(prompt)
-    
+
     if hasattr(gemini_response, "text"):
         viz_types = [v.strip().lower() for v in gemini_response.text.split(",") if v.strip().lower() in ["pie", "bar", "line", "scatter", "histogram"]]
         if len(viz_types) < 5:
-            viz_types = ["bar", "line", "pie", "scatter", "histogram"][:5]  # Default fallback
+            viz_types = ["bar", "line", "pie", "scatter", "histogram"][:5]
     else:
         st.error("Error: AI did not return a valid response.")
         st.stop()
@@ -97,7 +95,6 @@ if uploaded_file:
     st.subheader("📝 AI-Generated Business Insights")
     st.write("Analyzing data for key takeaways...")
 
-    # ✅ Generate AI Summary
     summary_prompt = f"Given this dataset with columns: {', '.join(df.columns)}, provide a summary of insights, trends, and possible business improvements."
     summary_response = model.generate_content(summary_prompt)
 
@@ -108,66 +105,55 @@ if uploaded_file:
         st.error("Error: AI did not return a valid summary.")
         st.stop()
 
-    # --- 📊 **Arrange Worksheets in a 3×2 Grid Layout** ---
     st.markdown("---")
     st.subheader("📈 Data Visualizations (5 Worksheets)")
-
-    # ✅ Create 3 columns for the grid layout
     cols = st.columns(3)
 
-    # ✅ Display charts in a 3×2 format
-    for i, fig in enumerate(charts[:5]):  # Limit to 5 charts
-        with cols[i % 3]:  # Distribute across columns
+    for i, fig in enumerate(charts[:5]):
+        with cols[i % 3]:
             st.plotly_chart(fig, use_container_width=True, key=f"worksheet_{i}")
 
     if st.button("📥 Download Report as PDF"):
         st.write("🔄 Generating Report... Please wait.")
 
-        # ✅ Save Charts as Images
         chart_images = []
         for i, fig in enumerate(charts):
             chart_path = f"chart_{i}.png"
-            pio.write_image(fig, chart_path)  # Save chart as image
+            pio.write_image(fig, chart_path)
             chart_images.append(chart_path)
 
-        # ✅ Format Business Summary into Short Bullets
-        summary_title = " Key Insights from your  Business Data"
-        
-        wrapped_text = textwrap.wrap(summary_text, width=120)  # Wrap text for better readability
-        # Limit the number of lines to 10 for the summary
-        wrapped_text = wrapped_text[:10]  # Limit to 10 lines for the summary
+        summary_title = "Key Insights from your Business Data"
+        wrapped_text = textwrap.wrap(summary_text, width=120)
+        wrapped_text = wrapped_text[:10]
         bullet_points = "".join(f"<li>{line.strip()}</li>" for line in wrapped_text if line.strip())
 
         summary_html = f"""
-        <h1 style="text-align:center; color:#2C3E50;"> Data Insighter</h1>
-        <h2 style="color:#1F618D;"> {summary_title}</h2>
+        <h1 style="text-align:center; color:#2C3E50;">Data Insighter</h1>
+        <h2 style="color:#1F618D;">{summary_title}</h2>
         <ul style="font-size:16px; line-height:1.6; color:#283747;">
             {bullet_points}
         </ul>
         <hr>
-        <h2 style="color:#1F618D;"> Data Visualizations</h2>
+        <h2 style="color:#1F618D;">Data Visualizations</h2>
         """
 
-        # ✅ Embed Charts as Images in the Report
         for img_path in chart_images:
             with open(img_path, "rb") as img_file:
                 base64_img = base64.b64encode(img_file.read()).decode()
             summary_html += f'<img src="data:image/png;base64,{base64_img}" style="width:100%; margin-bottom:20px;">'
 
-        # ✅ Generate & Download PDF
         pdf_path = "Business_Report.pdf"
-        pdfkit.from_string(summary_html, pdf_path, configuration=PDFKIT_CONFIG)
+        HTML(string=summary_html).write_pdf(pdf_path)  # ✅ WeasyPrint
 
         with open(pdf_path, "rb") as file:
             st.download_button("📥 Download Report", file, file_name="Business_Report.pdf", mime="application/pdf")
-        # AI Chatbot
+
     st.markdown("---")
     st.subheader("🤖 AI Chatbot for Data Queries")
 
     chat_history = st.session_state.get("chat_history", [])
 
     def chatbot_response(user_query):
-        """Fetch response from Gemini AI"""
         query_prompt = f"Analyze the uploaded dataset and answer: {user_query}"
         chat_response = model.generate_content(query_prompt)
         return chat_response.text if hasattr(chat_response, "text") else "I'm sorry, I couldn't process that."
@@ -187,7 +173,6 @@ if uploaded_file:
                 st.write(f"**You:** {chat['query']}")
                 st.write(f"**AI:** {chat['response']}")
 
-    # Floating Chatbot Button
     chat_open = st.sidebar.button("💬 Open Chatbot")
 
     if chat_open:
